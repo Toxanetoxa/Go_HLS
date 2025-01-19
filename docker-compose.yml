@@ -16,31 +16,6 @@ services:
     depends_on:
       - app
 
-  app:
-    container_name: back-end-app
-    build:
-      context: ./
-      dockerfile: docker/app.Dockerfile
-    ports:
-      - "8080:8080"
-    volumes:
-      - "./:/www/apps/backend/"
-      - "./.env:/www/apps/backend/.env"
-      - "./migrations:/www/apps/backend/migrations"
-    environment:
-      - DB_HOST=${DB_HOST}
-      - DB_USER=${DB_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - DB_NAME=${DB_NAME}
-      - DB_PORT=${DB_PORT}
-      - DB_SSL=${DB_SSL}
-    networks:
-      backend-app:
-        aliases:
-          - backend.app.loc
-    depends_on:
-      - redis
-
   redis:
     image: "redis:alpine"
     container_name: app_redis
@@ -67,6 +42,31 @@ services:
       backend-app:
         aliases:
           - postgres
+
+  app:
+    container_name: back-end-app
+    build:
+      context: ./
+      dockerfile: docker/app.Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - "./:/www/apps/backend/"
+      - "./.env:/www/apps/backend/.env"
+      - "./migrations:/www/apps/backend/migrations"
+    environment:
+      - DB_HOST=${DB_HOST}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - DB_PORT=${DB_PORT}
+      - DB_SSL=${DB_SSL}
+    networks:
+      backend-app:
+        aliases:
+          - backend.app.loc
+    depends_on:
+      - redis
 
 networks:
   backend-app:
