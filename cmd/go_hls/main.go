@@ -65,8 +65,11 @@ func main() {
 		authGroup.POST("/videos/upload", videoHandler.UploadVideo)
 	}
 
+	//r.POST("/videos/upload", videoHandler.UploadVideo)
+
 	// Маршрут для стриминга видео
 	r.GET("/videos/:id/stream", videoHandler.StreamVideo)
+	r.GET("/videos/:id/views", videoHandler.GetVideoViews)
 
 	err := r.Run(":8080")
 	l.Info("Starting server on :8080")

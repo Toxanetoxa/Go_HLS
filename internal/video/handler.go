@@ -94,8 +94,8 @@ func (h *Handler) StreamVideo(c *gin.Context) {
 	}
 
 	// Ищем видео в базе данных
-	var video Video
-	if err := h.DB.First(&video, videoID).Error; err != nil {
+	var v Video
+	if err := h.DB.First(&v, videoID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Video not found"})
 			return
@@ -104,8 +104,31 @@ func (h *Handler) StreamVideo(c *gin.Context) {
 		return
 	}
 
+	// Получаем IP-адрес пользователя
+	ip := c.ClientIP()
+
+	// Проверяем, был ли IP-адрес уже учтён
+	var existingView View
+	if err := h.DB.Where("video_id = ? AND ip_address = ?", v.ID, ip).First(&existingView).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// IP-адрес не найден, добавляем новый просмотр
+			view := View{
+				VideoID:   v.ID,
+				IPAddress: ip,
+			}
+
+			if err := h.DB.Create(&view).Error; err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save view", "details": err.Error()})
+				return
+			}
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check view", "details": err.Error()})
+			return
+		}
+	}
+
 	// Открываем файл
-	file, err := os.Open(video.FilePath)
+	file, err := os.Open(v.FilePath)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to open video file", "details": err.Error()})
 		return
@@ -131,4 +154,21 @@ func (h *Handler) StreamVideo(c *gin.Context) {
 
 	// Используем http.ServeContent для обработки Range-запросов
 	http.ServeContent(c.Writer, c.Request, fileInfo.Name(), fileInfo.ModTime(), file)
+}
+
+// GetVideoViews получение общего количества просмотров
+func (h *Handler) GetVideoViews(c *gin.Context) {
+	videoID := c.Param("id")
+	if videoID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Video ID is required"})
+		return
+	}
+
+	var count int64
+	if err := h.DB.Model(&View{}).Where("video_id = ?", videoID).Count(&count).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch view count", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"views": count})
 }

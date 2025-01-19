@@ -85,3 +85,5 @@ curl -X POST http://backend.app.loc/videos/upload \
 -F "author_id=1"
 
 curl -v -H "Range: bytes=0-1023" http://backend.app.loc/videos/1/stream --output video_part.mp4
+
+curl -X GET http://backend.app.loc/videos/1/stream

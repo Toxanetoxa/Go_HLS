@@ -13,6 +13,14 @@ type Video struct {
 	AuthorID  uint      `gorm:"not null"`
 	CreatedAt time.Time `gorm:"autoCreateTime"`
 	UpdatedAt time.Time `gorm:"autoUpdateTime"`
+	Views     []View    `gorm:"foreignKey:VideoID"` // Связь с таблицей video_views
+}
+
+type View struct {
+	ID        uint      `gorm:"primaryKey"`
+	VideoID   uint      `gorm:"not null"`
+	IPAddress string    `gorm:"not null"`
+	CreatedAt time.Time `gorm:"autoCreateTime"`
 }
 
 // EnsureUploadsDir проверяет наличие папки uploads и создаёт её, если она отсутствует.
