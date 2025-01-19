@@ -10,7 +10,6 @@ import (
 	"github.com/toxanetoxa/gohls/internal/video"
 	"github.com/toxanetoxa/gohls/pkg/logger"
 	"go.uber.org/zap"
-	"net/http"
 	"os"
 )
 
@@ -53,14 +52,6 @@ func main() {
 
 	videoHandler := video.NewVideoHandler(connectDB)
 
-	r.GET("/", func(c *gin.Context) {
-		c.JSON(200, gin.H{"message": "Success"})
-	})
-
-	// Маршрут для видео
-	r.POST("/videos/upload", videoHandler.UploadVideo)
-	r.GET("/videos/:id/stream", videoHandler.StreamVideo)
-
 	// Регистрация
 	r.POST("/register", auth.RegisterHandler(connectDB))
 	// Авторизация
@@ -70,11 +61,12 @@ func main() {
 	authGroup := r.Group("/")
 	authGroup.Use(auth.AuthMiddleware())
 	{
-		authGroup.GET("/protected", func(c *gin.Context) {
-			username := c.GetString("username")
-			c.JSON(http.StatusOK, gin.H{"message": "Hello, " + username})
-		})
+		// Маршрут для загрузки видео
+		authGroup.POST("/videos/upload", videoHandler.UploadVideo)
 	}
+
+	// Маршрут для стриминга видео
+	r.GET("/videos/:id/stream", videoHandler.StreamVideo)
 
 	err := r.Run(":8080")
 	l.Info("Starting server on :8080")
