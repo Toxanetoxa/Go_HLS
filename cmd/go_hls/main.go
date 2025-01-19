@@ -51,8 +51,9 @@ func main() {
 
 	videoHandler := video.NewVideoHandler(connectDB)
 
-	// Маршрут для загрузки видео
+	// Маршрут для видео
 	r.POST("/videos/upload", videoHandler.UploadVideo)
+	r.GET("/videos/:id/stream", videoHandler.StreamVideo)
 
 	r.GET("/", func(c *gin.Context) {
 		c.JSON(200, gin.H{"message": "Success"})

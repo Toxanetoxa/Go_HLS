@@ -1,7 +1,9 @@
 package video
 
 import (
+	"github.com/pkg/errors"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strconv"
 
@@ -72,4 +74,53 @@ func (h *Handler) UploadVideo(c *gin.Context) {
 		"message":  "Video uploaded successfully",
 		"video_id": video.ID,
 	})
+}
+
+// StreamVideo обрабатывает запрос на стриминг видео.
+func (h *Handler) StreamVideo(c *gin.Context) {
+	// Получаем ID видео из параметров запроса
+	videoID := c.Param("id")
+	if videoID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Video ID is required"})
+		return
+	}
+
+	// Ищем видео в базе данных
+	var video Video
+	if err := h.DB.First(&video, videoID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Video not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch video", "details": err.Error()})
+		return
+	}
+
+	// Открываем файл
+	file, err := os.Open(video.FilePath)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to open video file", "details": err.Error()})
+		return
+	}
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to close file", "details": err.Error()})
+		}
+	}(file)
+
+	// Получаем информацию о файле
+	fileInfo, err := file.Stat()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get file info", "details": err.Error()})
+		return
+	}
+
+	// Устанавливаем заголовки для стриминга
+	c.Header("Accept-Ranges", "bytes")
+	c.Header("Content-Type", "video/mp4") // Укажите правильный MIME-тип для вашего видео
+	c.Header("Content-Length", strconv.FormatInt(fileInfo.Size(), 10))
+
+	// Используем http.ServeContent для обработки Range-запросов
+	http.ServeContent(c.Writer, c.Request, fileInfo.Name(), fileInfo.ModTime(), file)
 }
