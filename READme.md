@@ -34,6 +34,8 @@ go_hls/
 └── READme.md
 ```
 
+### !!! Прежде всего создайте .ENV фаил по примеру .ENV.EXAMPLE !!!
+
 ##  Сборка и запуск приложения:
 В проекте используется Make все команды можно посмотреть 
 ```shell
@@ -149,7 +151,7 @@ console.log("WebSocket connection closed");
 };
 ```
 
-### Тестовый запрос:
+### Тестовые запросы (only for me):
 curl -X POST http://backend.app.loc/videos/upload \
 -F "file=@/Users/antonsotnik/Documents/meine/test.mov" \
 -F "title=My Video" \
