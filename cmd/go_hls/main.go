@@ -5,10 +5,12 @@ import (
 	"github.com/gin-gonic/gin"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/joho/godotenv"
+	"github.com/toxanetoxa/gohls/internal/auth"
 	"github.com/toxanetoxa/gohls/internal/db"
 	"github.com/toxanetoxa/gohls/internal/video"
 	"github.com/toxanetoxa/gohls/pkg/logger"
 	"go.uber.org/zap"
+	"net/http"
 	"os"
 )
 
@@ -51,13 +53,28 @@ func main() {
 
 	videoHandler := video.NewVideoHandler(connectDB)
 
+	r.GET("/", func(c *gin.Context) {
+		c.JSON(200, gin.H{"message": "Success"})
+	})
+
 	// Маршрут для видео
 	r.POST("/videos/upload", videoHandler.UploadVideo)
 	r.GET("/videos/:id/stream", videoHandler.StreamVideo)
 
-	r.GET("/", func(c *gin.Context) {
-		c.JSON(200, gin.H{"message": "Success"})
-	})
+	// Регистрация
+	r.POST("/register", auth.RegisterHandler(connectDB))
+	// Авторизация
+	r.POST("/login", auth.LoginHandler(connectDB))
+
+	// Защищенные эндпоинты
+	authGroup := r.Group("/")
+	authGroup.Use(auth.AuthMiddleware())
+	{
+		authGroup.GET("/protected", func(c *gin.Context) {
+			username := c.GetString("username")
+			c.JSON(http.StatusOK, gin.H{"message": "Hello, " + username})
+		})
+	}
 
 	err := r.Run(":8080")
 	l.Info("Starting server on :8080")
