@@ -83,3 +83,5 @@ curl -X POST http://backend.app.loc/videos/upload \
 -F "file=@/Users/antonsotnik/Documents/meine/test.mov" \
 -F "title=My Video" \
 -F "author_id=1"
+
+curl -v -H "Range: bytes=0-1023" http://backend.app.loc/videos/1/stream --output video_part.mp4
