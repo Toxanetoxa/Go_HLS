@@ -1,0 +1,76 @@
+#version: '3'
+
+services:
+  nginx:
+    container_name: back-end-nginx
+    build:
+      context: ./
+      dockerfile: docker/nginx.Dockerfile
+    ports:
+      - "80:80"
+    volumes:
+      - "./nginx_conf/nginx.conf:/etc/nginx/nginx.conf"
+      - "./nginx_conf/sites-enabled:/etc/nginx/conf.d/"
+    networks:
+      - backend-app
+    depends_on:
+      - app
+
+  app:
+    container_name: back-end-app
+    build:
+      context: ./
+      dockerfile: docker/app.Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - "./:/www/apps/backend/"
+      - "./.env:/www/apps/backend/.env"
+      - "./migrations:/www/apps/backend/migrations"
+    environment:
+      - DB_HOST=${DB_HOST}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - DB_PORT=${DB_PORT}
+      - DB_SSL=${DB_SSL}
+    networks:
+      backend-app:
+        aliases:
+          - backend.app.loc
+    depends_on:
+      - redis
+
+  redis:
+    image: "redis:alpine"
+    container_name: app_redis
+    ports:
+      - "16379:6379"
+    command: redis-server --requirepass secret
+    networks:
+      backend-app:
+        aliases:
+          - redis
+
+  postgres:
+    image: "postgres:15-alpine"
+    container_name: app_postgres
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: app_db
+    ports:
+      - "15432:5432"
+    volumes:
+      - "postgres_data:/var/lib/postgresql/data"
+    networks:
+      backend-app:
+        aliases:
+          - postgres
+
+networks:
+  backend-app:
+    driver: bridge
+
+volumes:
+  postgres_data:
