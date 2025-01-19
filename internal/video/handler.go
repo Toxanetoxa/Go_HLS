@@ -2,6 +2,7 @@ package video
 
 import (
 	"github.com/pkg/errors"
+	"github.com/toxanetoxa/gohls/internal/user"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -43,10 +44,17 @@ func (h *Handler) UploadVideo(c *gin.Context) {
 		return
 	}
 
-	// Получаем ID автора
-	authorID, err := strconv.Atoi(c.PostForm("author_id"))
-	if err != nil || authorID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid author ID"})
+	// Получаем имя пользователя из контекста (установленного в middleware)
+	username := c.GetString("username")
+	if username == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	// Ищем пользователя по имени
+	var u user.User
+	if err := h.DB.Where("username = ?", username).First(&u).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user", "details": err.Error()})
 		return
 	}
 
@@ -61,7 +69,7 @@ func (h *Handler) UploadVideo(c *gin.Context) {
 	video := Video{
 		Title:    title,
 		FilePath: filePath,
-		AuthorID: uint(authorID),
+		AuthorID: u.ID,
 	}
 
 	if err := h.DB.Create(&video).Error; err != nil {
