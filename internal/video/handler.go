@@ -1,25 +1,73 @@
 package video
 
 import (
-	"github.com/pkg/errors"
+	"errors"
 	"github.com/toxanetoxa/gohls/internal/user"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
 	"gorm.io/gorm"
 )
 
+type ActiveViewers struct {
+	mu      sync.Mutex
+	viewers map[string]map[*websocket.Conn]bool // videoID -> connections
+}
+
+func NewActiveViewers() *ActiveViewers {
+	return &ActiveViewers{
+		viewers: make(map[string]map[*websocket.Conn]bool),
+	}
+}
+
+// AddViewer добавляет зрителя для указанного видео.
+func (av *ActiveViewers) AddViewer(videoID string, conn *websocket.Conn) {
+	av.mu.Lock()
+	defer av.mu.Unlock()
+
+	if av.viewers[videoID] == nil {
+		av.viewers[videoID] = make(map[*websocket.Conn]bool)
+	}
+	av.viewers[videoID][conn] = true
+}
+
+// RemoveViewer удаляет зрителя для указанного видео.
+func (av *ActiveViewers) RemoveViewer(videoID string, conn *websocket.Conn) {
+	av.mu.Lock()
+	defer av.mu.Unlock()
+
+	delete(av.viewers[videoID], conn)
+	if len(av.viewers[videoID]) == 0 {
+		delete(av.viewers, videoID)
+	}
+}
+
+// GetViewers возвращает количество активных зрителей для указанного видео.
+func (av *ActiveViewers) GetViewers(videoID string) int {
+	av.mu.Lock()
+	defer av.mu.Unlock()
+
+	return len(av.viewers[videoID])
+}
+
 // Handler обрабатывает запросы, связанные с видео.
 type Handler struct {
-	DB *gorm.DB
+	DB            *gorm.DB
+	ActiveViewers *ActiveViewers
 }
 
 // NewVideoHandler создаёт новый экземпляр Handler.
 func NewVideoHandler(db *gorm.DB) *Handler {
-	return &Handler{DB: db}
+	return &Handler{
+		DB:            db,
+		ActiveViewers: NewActiveViewers(),
+	}
 }
 
 // UploadVideo обрабатывает загрузку видео.
@@ -154,6 +202,19 @@ func (h *Handler) StreamVideo(c *gin.Context) {
 
 	// Используем http.ServeContent для обработки Range-запросов
 	http.ServeContent(c.Writer, c.Request, fileInfo.Name(), fileInfo.ModTime(), file)
+
+	// Отправляем количество активных зрителей через WebSocket
+	go func() {
+		for {
+			time.Sleep(5 * time.Second) // Обновляем каждые 5 секунд
+			activeViewers := h.ActiveViewers.GetViewers(videoID)
+			for conn := range h.ActiveViewers.viewers[videoID] {
+				if err := conn.WriteJSON(gin.H{"active_viewers": activeViewers}); err != nil {
+					h.ActiveViewers.RemoveViewer(videoID, conn)
+				}
+			}
+		}
+	}()
 }
 
 // GetVideoViews получение общего количества просмотров
@@ -171,4 +232,38 @@ func (h *Handler) GetVideoViews(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"views": count})
+}
+
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true // Разрешить все источники (в реальном проекте настройте правильно)
+	},
+}
+
+// ActiveViewersWS обрабатывает WebSocket-соединения для отслеживания активных зрителей.
+func (h *Handler) ActiveViewersWS(c *gin.Context) {
+	videoID := c.Param("id")
+	if videoID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Video ID is required"})
+		return
+	}
+
+	// Обновляем HTTP-соединение до WebSocket
+	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upgrade to WebSocket", "details": err.Error()})
+		return
+	}
+	defer conn.Close()
+
+	// Добавляем зрителя
+	h.ActiveViewers.AddViewer(videoID, conn)
+	defer h.ActiveViewers.RemoveViewer(videoID, conn)
+
+	// Бесконечный цикл для поддержания соединения
+	for {
+		if _, _, err := conn.ReadMessage(); err != nil {
+			break
+		}
+	}
 }

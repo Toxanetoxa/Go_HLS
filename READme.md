@@ -87,3 +87,20 @@ curl -X POST http://backend.app.loc/videos/upload \
 curl -v -H "Range: bytes=0-1023" http://backend.app.loc/videos/1/stream --output video_part.mp4
 
 curl -X GET http://backend.app.loc/videos/1/stream
+
+
+На стороне клиента можно использовать WebSocket для получения данных о количестве активных зрителей:
+```javascript
+const videoId = 1; // Замените на ID видео
+const socket = new WebSocket(`ws://backend.app.loc/videos/${videoId}/active-viewers`);
+
+socket.onmessage = function (event) {
+const data = JSON.parse(event.data);
+console.log("Active viewers:", data.active_viewers);
+// Обновите интерфейс, чтобы отобразить количество активных зрителей
+};
+
+socket.onclose = function () {
+console.log("WebSocket connection closed");
+};
+```

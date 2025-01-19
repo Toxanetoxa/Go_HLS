@@ -65,6 +65,7 @@ func main() {
 		authGroup.POST("/videos/upload", videoHandler.UploadVideo)
 	}
 
+	// TODO Remove
 	//r.POST("/videos/upload", videoHandler.UploadVideo)
 
 	// Маршрут для стриминга видео
