@@ -1,4 +1,4 @@
-package migrate
+package main
 
 import (
 	"fmt"
@@ -17,9 +17,9 @@ func main() {
 		}
 	}(l)
 
-	//loadEnv(l)
+	// LoadEnv(l)
 
-	// Получаем конфиг для подключения к бд
+	// Получаем конфигурацию для подключения к бд
 	dsn := fmt.Sprintf(
 		"host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
 		os.Getenv("DB_HOST"),
@@ -29,8 +29,6 @@ func main() {
 		os.Getenv("DB_PORT"),
 		os.Getenv("DB_SSL"),
 	)
-
-	l.Info(dsn)
 
 	// Подключаемся к базе
 	dbConn := db.ConnectDB(l, dsn)

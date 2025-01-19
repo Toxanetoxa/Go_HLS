@@ -29,7 +29,7 @@ func main() {
 		}
 	}(l)
 
-	//loadEnv(l)
+	loadEnv(l)
 
 	// Получаем конфиг для подключения к бд
 	dsn := fmt.Sprintf(
@@ -41,8 +41,6 @@ func main() {
 		os.Getenv("DB_PORT"),
 		os.Getenv("DB_SSL"),
 	)
-
-	l.Info(dsn)
 
 	// Подключаемся к базе
 	dbConn := db.ConnectDB(l, dsn)

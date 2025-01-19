@@ -40,6 +40,11 @@ start: network build up-build ## Первый запуск РЕКОМЕНДУЕ�
 up: ## Запуск готовых контейнеров для работы
 	docker-compose up -d
 
+rebuild-app: ## Пересобирает только контейнер app
+	@echo "Rebuilding app container..."
+	docker-compose build --no-cache app
+	docker-compose up -d --no-deps app
+
 help: ## Показывает это сообщение с описанием всех команд
 	@echo "Доступные команды:"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'

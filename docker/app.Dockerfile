@@ -10,10 +10,10 @@ RUN go mod download
 # Копируем весь проект
 COPY . .
 
-# Собираем исполняемый файл для основного приложения
+# Собираем основное приложение
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /usr/local/bin/app ./cmd/go_hls
 
-# Собираем исполняемый файл для миграций
+# Собираем миграции
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /usr/local/bin/migrate ./cmd/migrate
 
 # Проверяем, что файлы скомпилированы
