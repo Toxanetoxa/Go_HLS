@@ -43,11 +43,13 @@ func main() {
 	)
 
 	// Подключаемся к базе
-	dbConn := db.ConnectDB(l, dsn)
+	connectDB := db.ConnectDB(l, dsn)
 
 	r := gin.Default()
 
-	videoHandler := video.NewVideoHandler(dbConn)
+	r.MaxMultipartMemory = 100 << 20
+
+	videoHandler := video.NewVideoHandler(connectDB)
 
 	// Маршрут для загрузки видео
 	r.POST("/videos/upload", videoHandler.UploadVideo)

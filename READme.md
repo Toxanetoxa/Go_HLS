@@ -77,3 +77,9 @@ Redis будет крутиться в network приложения и он бу
 - JWT: github.com/golang-jwt/jwt/v5
 - Storage: Локально (storage/) или MinIO (S3)
 - WebSocket: github.com/gorilla/websocket
+
+### Тестовый запрос:
+curl -X POST http://backend.app.loc/videos/upload \
+-F "file=@/Users/antonsotnik/Documents/meine/test.mov" \
+-F "title=My Video" \
+-F "author_id=1"
