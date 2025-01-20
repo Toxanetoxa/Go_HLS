@@ -1,8 +1,10 @@
 package auth
 
 import (
+	"errors"
 	"github.com/toxanetoxa/gohls/internal/user"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -23,10 +25,33 @@ type LoginRequest struct {
 	Password string `json:"password" binding:"required"`
 }
 
+func validatePassword(password string) error {
+	if len(password) < 8 {
+		return errors.New("password must be at least 8 characters long")
+	}
+
+	if !regexp.MustCompile(`[0-9]`).MatchString(password) {
+		return errors.New("password must contain at least one digit")
+	}
+
+	if !regexp.MustCompile(`[a-zA-Z]`).MatchString(password) {
+		return errors.New("password must contain at least one letter")
+	}
+
+	return nil
+}
+
+// RegisterHandler - регистрация нового пользователя
 func RegisterHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req RegisterRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		// Проверяем сложность пароля
+		if err := validatePassword(req.Password); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -61,6 +86,7 @@ func RegisterHandler(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
+// LoginHandler - авторизация
 func LoginHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req LoginRequest

@@ -2,11 +2,14 @@ package video
 
 import (
 	"errors"
+	"fmt"
 	"github.com/toxanetoxa/gohls/internal/user"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -266,4 +269,154 @@ func (h *Handler) ActiveViewersWS(c *gin.Context) {
 			break
 		}
 	}
+}
+
+// GetVideoInfo возвращает информацию о видео.
+func (h *Handler) GetVideoInfo(c *gin.Context) {
+	videoID := c.Param("id")
+	if videoID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Video ID is required"})
+		return
+	}
+
+	// Ищем видео в базе данных
+	var v Video
+	if err := h.DB.First(&v, videoID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Video not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch video", "details": err.Error()})
+		return
+	}
+
+	// Получаем информацию о файле
+	fileInfo, err := os.Stat(v.FilePath)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get file info", "details": err.Error()})
+		return
+	}
+
+	// Возвращаем информацию о видео
+	c.JSON(http.StatusOK, gin.H{
+		"video_id":  v.ID,
+		"title":     v.Title,
+		"file_size": fileInfo.Size(),
+		"duration":  "TODO: Добавьте логику для получения длительности видео", // TODO: Добавьте логику для получения длительности видео
+	})
+}
+
+// GetVideoChunk возвращает конкретную часть видеофайла.
+func (h *Handler) GetVideoChunk(c *gin.Context) {
+	videoID := c.Param("id")
+	if videoID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Video ID is required"})
+		return
+	}
+
+	// Ищем видео в базе данных
+	var v Video
+	if err := h.DB.First(&v, videoID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Video not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch video", "details": err.Error()})
+		return
+	}
+
+	// Открываем файл
+	file, err := os.Open(v.FilePath)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to open video file", "details": err.Error()})
+		return
+	}
+	defer file.Close()
+
+	// Получаем информацию о файле
+	fileInfo, err := file.Stat()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get file info", "details": err.Error()})
+		return
+	}
+
+	// Обрабатываем Range-заголовок
+	rangeHeader := c.GetHeader("Range")
+	if rangeHeader == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Range header is required"})
+		return
+	}
+
+	// Парсим Range-заголовок
+	ranges, err := parseRange(rangeHeader, fileInfo.Size())
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid range header", "details": err.Error()})
+		return
+	}
+
+	// Если запрошен один диапазон
+	if len(ranges) == 1 {
+		start := ranges[0].start
+		end := ranges[0].end
+
+		// Устанавливаем заголовки для частичного контента
+		c.Header("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, fileInfo.Size()))
+		c.Header("Content-Length", strconv.FormatInt(end-start+1, 10))
+		c.Status(http.StatusPartialContent)
+
+		// Читаем и отправляем запрошенную часть файла
+		_, err = file.Seek(start, io.SeekStart)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to seek file", "details": err.Error()})
+			return
+		}
+
+		_, err = io.CopyN(c.Writer, file, end-start+1)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send file chunk", "details": err.Error()})
+			return
+		}
+	} else {
+		// Если запрошено несколько диапазонов, возвращаем ошибку (можно реализовать поддержку множественных диапазонов)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Multiple ranges are not supported"})
+		return
+	}
+}
+
+// parseRange парсит Range-заголовок и возвращает список диапазонов.
+func parseRange(rangeHeader string, fileSize int64) ([]struct{ start, end int64 }, error) {
+	// Пример Range-заголовка: "bytes=0-499"
+	if !strings.HasPrefix(rangeHeader, "bytes=") {
+		return nil, errors.New("invalid range header")
+	}
+
+	rangeStr := strings.TrimPrefix(rangeHeader, "bytes=")
+	ranges := strings.Split(rangeStr, ",")
+
+	var result []struct{ start, end int64 }
+
+	for _, r := range ranges {
+		parts := strings.Split(r, "-")
+		if len(parts) != 2 {
+			return nil, errors.New("invalid range format")
+		}
+
+		start, err := strconv.ParseInt(parts[0], 10, 64)
+		if err != nil {
+			return nil, errors.New("invalid start value")
+		}
+
+		end, err := strconv.ParseInt(parts[1], 10, 64)
+		if err != nil {
+			return nil, errors.New("invalid end value")
+		}
+
+		if start < 0 || end >= fileSize || start > end {
+			return nil, errors.New("invalid range values")
+		}
+
+		result = append(result, struct{ start, end int64 }{start, end})
+	}
+
+	return result, nil
 }

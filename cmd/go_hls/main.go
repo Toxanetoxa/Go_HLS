@@ -71,6 +71,8 @@ func main() {
 	// Маршрут для стриминга видео
 	r.GET("/videos/:id/stream", videoHandler.StreamVideo)
 	r.GET("/videos/:id/views", videoHandler.GetVideoViews)
+	r.GET("/video/:id/info", videoHandler.GetVideoInfo)
+	r.GET("/video/:id/chunk", videoHandler.GetVideoChunk)
 
 	err := r.Run(":8080")
 	l.Info("Starting server on :8080")
