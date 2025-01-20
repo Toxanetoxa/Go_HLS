@@ -18,6 +18,8 @@ import (
 	"gorm.io/gorm"
 )
 
+// TODO перенести сигнатуры в video.go
+
 type ActiveViewers struct {
 	mu      sync.Mutex
 	viewers map[string]map[*websocket.Conn]bool // videoID -> connections
