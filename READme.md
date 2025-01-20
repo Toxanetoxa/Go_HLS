@@ -94,9 +94,9 @@ go_hls/
 - POST /videos/upload — загрузка видео (multipart/form-data).
 - GET /videos/{id}/stream - скачивание полного видео
 - GET /video/{id}/views - получение количества просмотров
-- GET /video/:id/active-viewers - получение активных зрителей
-- GET /video/:id/info - получение данных о видео
-- GET /video/:id/chunk - получение видео по чанкам 
+- GET /video/{id}/active-viewers - получение активных зрителей
+- GET /video/{id}/info - получение данных о видео
+- GET /video/{id}/chunk - получение видео по чанкам 
 # Stack
 - Backend: Go 1.21 + Gin
 - Database: PostgreSQL (gorm)
