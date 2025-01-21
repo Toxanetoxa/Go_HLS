@@ -75,7 +75,7 @@ func main() {
 	r.GET("/video/:id/info", videoHandler.GetVideoInfo)
 	r.GET("/video/:id/chunk", videoHandler.GetVideoChunk)
 
-	// Защищенные эндпоинты
+	// Защищенные эндпоинт
 	authGroup := r.Group("/")
 	authGroup.Use(auth.AuthMiddleware())
 	{
