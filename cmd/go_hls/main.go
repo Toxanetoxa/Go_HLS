@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/joho/godotenv"
@@ -11,6 +12,7 @@ import (
 	"github.com/toxanetoxa/gohls/pkg/logger"
 	"go.uber.org/zap"
 	"os"
+	"time"
 )
 
 func loadEnv(logger *zap.SugaredLogger) {
@@ -43,12 +45,23 @@ func main() {
 		os.Getenv("DB_SSL"),
 	)
 
-	// Подключаемся к базе
+	// Подключаемся к бд
 	connectDB := db.ConnectDB(l, dsn)
 
 	r := gin.Default()
 
 	r.MaxMultipartMemory = 100 << 20
+
+	frontUri := os.Getenv("FRONT_URI")
+
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{frontUri},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
 
 	videoHandler := video.NewVideoHandler(connectDB)
 
@@ -56,6 +69,11 @@ func main() {
 	r.POST("/register", auth.RegisterHandler(connectDB))
 	// Авторизация
 	r.POST("/login", auth.LoginHandler(connectDB))
+	// Маршрут для стриминга видео
+	r.GET("/videos/:id/stream", videoHandler.StreamVideo)
+	r.GET("/videos/:id/views", videoHandler.GetVideoViews)
+	r.GET("/video/:id/info", videoHandler.GetVideoInfo)
+	r.GET("/video/:id/chunk", videoHandler.GetVideoChunk)
 
 	// Защищенные эндпоинты
 	authGroup := r.Group("/")
@@ -64,15 +82,6 @@ func main() {
 		// Маршрут для загрузки видео
 		authGroup.POST("/videos/upload", videoHandler.UploadVideo)
 	}
-
-	// TODO Remove
-	//r.POST("/videos/upload", videoHandler.UploadVideo)
-
-	// Маршрут для стриминга видео
-	r.GET("/videos/:id/stream", videoHandler.StreamVideo)
-	r.GET("/videos/:id/views", videoHandler.GetVideoViews)
-	r.GET("/video/:id/info", videoHandler.GetVideoInfo)
-	r.GET("/video/:id/chunk", videoHandler.GetVideoChunk)
 
 	err := r.Run(":8080")
 	l.Info("Starting server on :8080")
